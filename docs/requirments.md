@@ -1,11 +1,14 @@
 # PayLink Requirements Pack
 
 **Members & roles:**
-  Requirements & Product Lead: `Mohamed Khaled`
-  Quality & DevOps Lead: `Hossam Abdul Menem`
-  Architecture Lead: `Amira Fawaz & Yussef Mahmoud`
+-  Requirements & Product Lead: `Mohamed Khaled`
+-  Quality & DevOps Lead: `Hossam Abdul Menem`
+-  Architecture Lead: `Amira Fawaz & Yussef Mahmoud`
+
  **Repo:** `https://github.com/hossamkhero/PayLink`
+
  **Tech stack:** ` Python 3 + FastAPI + PostgreSQL 16`
+
  **Date:** `[2026-11-23]`
 
 ---
