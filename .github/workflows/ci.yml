@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  # Only master gets a push run. Feature branches are covered by their PR, so
+  # the same commit isn't tested twice (push + pull_request) for one SHA.
+  push:
+    branches: [master]
+  # Any PR, on the default activity types: opened, synchronize, reopened.
+  pull_request:
+  # Adds a "Run workflow" button in the Actions tab.
+  workflow_dispatch:
+
+# One run per ref. A new commit on a PR cancels its superseded run; master
+# runs queue instead, so every merge keeps its own result.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# The token can write to the repo by default; CI only needs to read it.
+permissions:
+  contents: read
+
+env:
+  # Pinned so CI resolves with the same uv that produced uv.lock.
+  UV_VERSION: "0.11.21"
+  PYTHON_VERSION: "3.12"  # must match the Dockerfile base image
+
+jobs:
+  lint:
+    # These names are what branch protection requires; renaming breaks the gate.
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs uv + Python 3.12 and caches uv's downloads between runs.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+
+      # --frozen fails the job when uv.lock is out of date instead of re-resolving.
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # No minimum yet: --cov-fail-under=70 arrives in Phase 2 with the domain tests.
+      - name: Run tests with coverage
+        run: >
+          uv run pytest
+          --cov=paylink
+          --cov-report=term-missing
+          --cov-report=xml
+
+      # always() so a red run still uploads its coverage report.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: warn
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]  # gate: don't build an image for code that failed
+    steps:
+      - uses: actions/checkout@v4
+
+      # BuildKit is needed for the cache mounts in the Dockerfile.
+      - uses: docker/setup-buildx-action@v3
+
+      # push: false — this only proves the Dockerfile builds; nothing is published.
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
