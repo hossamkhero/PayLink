@@ -15,14 +15,14 @@ Customers top up a digital wallet and pay bills through it; PayLink charges a se
 ## Quick start
 
 ```bash
-git clone [repo URL] && cd paylink
+git clone https://github.com/hossamkhero/PayLink && cd paylink
 docker compose up
 ```
 
 The app starts at http://localhost:8080. At Phase 1 it serves only GET /health, which returns {"status": "ok"}.
 
 Repository layout
-
+```text
 docs/
   requirements.md          Requirements pack (Phase 1)
   design/                  Mermaid diagram sources
@@ -38,5 +38,6 @@ src/
   reconciliation/          Nightly settlement comparison
 Dockerfile
 docker-compose.yml
+```
 
 Money columns are DECIMAL(12,2) EGP in the database; conversion to piasters happens only inside the ElectroCo adapter.
