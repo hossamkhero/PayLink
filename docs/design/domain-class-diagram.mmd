@@ -1,0 +1,718 @@
+classDiagram
+    direction TB
+
+    class AccountHolder {
+        <<abstract>>
+        +UUID id
+        +String name
+        +String phone
+        +String email
+        +AccountStatus status
+        +DateTime createdAt
+    }
+    class Customer {
+        +VerificationLevel verificationLevel
+        +register(name, phone, email) Customer
+        +upgradeTo(level) void
+        +singleLimit() Decimal
+        +dailyLimit() Decimal
+        +paidToday(now) Decimal
+        +remainingDaily(now) Decimal
+        +isBlocked(now) boolean
+    }
+    class Agent {
+        +String shopName
+        +Decimal commissionRate
+        +payOnBehalf(customer, request) Payment
+        +cashIn(customer, amount) TopUp
+        +earnCommission(payment) LedgerEntry
+    }
+    class StaffUser {
+        +UUID id
+        +String name
+        +String email
+        +StaffRole role
+    }
+    class VerificationRequest {
+        +UUID id
+        +String documentRef
+        +VerificationStatus status
+        +DateTime reviewedAt
+        +DateTime createdAt
+        +approve(admin) void
+        +reject(admin) void
+    }
+    class LimitPolicy {
+        +VerificationLevel level
+        +Decimal singleLimit
+        +Decimal dailyLimit
+        +exceedsSingle(amount) boolean
+        +exceedsDaily(paidToday, amount) boolean
+    }
+    class AccountBlock {
+        +UUID id
+        +String reasonCode
+        +DateTime blockedFrom
+        +DateTime blockedUntil
+        +UUID createdBy
+        +isActive(now) boolean
+    }
+
+    class Wallet {
+        +UUID id
+        +WalletType type
+        +UUID billerId
+        +String currency
+        +DateTime createdAt
+        +available() Decimal
+        +held() Decimal
+        +history(page, size) List~LedgerEntry~
+    }
+    class LedgerEntry {
+        <<append-only>>
+        +UUID id
+        +EntryType entryType
+        +Decimal availableDelta
+        +Decimal heldDelta
+        +UUID actorId
+        +UUID postingId
+        +String reasonCode
+        +UUID correlationId
+        +DateTime createdAt
+    }
+    class AuditRecord {
+        +UUID id
+        +AuditType auditType
+        +UUID actorId
+        +ActorType actorType
+        +String action
+        +String reasonCode
+        +UUID correlationId
+        +String entityType
+        +UUID entityId
+        +UUID ledgerEntryId
+        +Map beforeState
+        +Map afterState
+        +Map details
+        +DateTime createdAt
+    }
+
+    class TopUp {
+        +UUID id
+        +String reference
+        +TopUpChannel channel
+        +Decimal amount
+        +TopUpStatus status
+        +DateTime createdAt
+    }
+    class TopUpChannel {
+        <<enumeration>>
+        CARD_SIMULATED
+        AGENT_CASH
+    }
+    class TopUpStatus {
+        <<enumeration>>
+        COMPLETED
+        FAILED
+    }
+
+    class Biller {
+        +UUID id
+        +String code
+        +String name
+        +Protocol protocol
+        +String adapterKey
+        +BillerStatus status
+        +int timeoutSeconds
+        +Map config
+        +DateTime createdAt
+        +DateTime updatedAt
+        +isAcceptingPayments() boolean
+    }
+    class BillerService {
+        +UUID id
+        +String code
+        +String name
+        +ServiceCategory category
+        +List~String~ requiredFields
+        +BillerStatus status
+    }
+
+    class FeeRule {
+        +UUID id
+        +FeeType feeType
+        +Decimal fixedAmount
+        +Decimal percentage
+        +Decimal minFee
+        +calculate(amount) Decimal
+    }
+    class FeeTier {
+        +UUID id
+        +Decimal minAmount
+        +Decimal maxAmount
+        +Decimal fee
+    }
+    class Promotion {
+        +UUID id
+        +Decimal feeOverride
+        +DateTime startsAt
+        +DateTime endsAt
+        +boolean active
+        +isActive(now) boolean
+    }
+    class FeeCalculator {
+        <<service>>
+        +computeFee(service, amount, now) Decimal
+        +buildSnapshot(service, amount, now) Map
+    }
+
+    class Inquiry {
+        +UUID id
+        +Map inputFields
+        +Decimal amountDue
+        +Decimal serviceFee
+        +Decimal total
+        +Map feeSnapshot
+        +String billerBillRef
+        +DateTime expiresAt
+        +DateTime createdAt
+        +isExpired(now) boolean
+    }
+    class Payment {
+        +UUID id
+        +String reference
+        +UUID accountHolderId
+        +UUID walletId
+        +UUID initiatedByAgentId
+        +Map inputFields
+        +Decimal amount
+        +Decimal serviceFee
+        +Decimal total
+        +Map feeSnapshot
+        +PaymentStatus status
+        +String rejectionReason
+        +String failureReason
+        +UUID inquiryId
+        +UUID correlationId
+        +UUID feeRuleId
+        +UUID promotionId
+        +Decimal commissionRate
+        +Decimal commissionAmount
+        +String billerReference
+        +int attemptCount
+        +DateTime nextRetryAt
+        +int version
+        +DateTime createdAt
+        +DateTime updatedAt
+        +apply(event) void
+        +isFinal() boolean
+        +markUnknown(now) void
+        +scheduleRetry(now) void
+        +canRetry() boolean
+        +isAwaitingReconciliation() boolean
+    }
+    class PaymentTransitionRule {
+        +PaymentStatus fromState
+        +PaymentStatus toState
+    }
+    class PaymentStateHistory {
+        +UUID id
+        +UUID paymentId
+        +PaymentStatus fromState
+        +PaymentStatus toState
+        +String event
+        +DateTime createdAt
+    }
+    class PaymentStateMachine {
+        <<service>>
+        +canTransition(from, event) boolean
+        +transition(payment, event) PaymentStatus
+    }
+    class PaymentService {
+        <<service>>
+        +submit(accountHolderId, request, idempotencyKey) Payment
+        +findExisting(accountHolderId, idempotencyKey) Payment
+        +holdFunds(payment) void
+        +completePayment(payment) void
+        +failPayment(payment, reason) void
+        +refundPayment(payment) void
+        +handleCallback(billerReference, result) void
+        +retryUnknown(payment) void
+    }
+    class PaymentTrace {
+        <<value object>>
+        +Payment payment
+        +List~PaymentStateHistory~ stateHistory
+        +List~BillerCallLog~ billerCalls
+        +List~BillerCallbackLog~ billerCallbacks
+        +List~Notification~ notifications
+    }
+    class InquiryService {
+        <<service>>
+        +createInquiry(customer, service, inputFields, now) Inquiry
+    }
+    class SupportService {
+        <<service>>
+        +findByReference(staff, reference) PaymentTrace
+    }
+    class WalletService {
+        <<service>>
+        +openWallet(holder) Wallet
+        +topUp(customer, amount, channel) TopUp
+        +fundAgentFloat(finance, agent, amount, reasonCode) void
+    }
+    class NotificationService {
+        <<service>>
+        +queuePaymentOutcome(payment) void
+        +retryFailed(now) void
+    }
+    class ReconciliationService {
+        <<service>>
+        +reconcile(biller, settlementFile) ReconciliationRun
+    }
+    class AuditService {
+        <<service>>
+        +recordMoney(ledgerEntry, correlationId) AuditRecord
+        +recordAdmin(actor, action, entity, before, after, reasonCode) AuditRecord
+    }
+    class RiskChecker {
+        <<service>>
+        +checkSingleLimit(payment) void
+        +checkDailyLimit(payment) void
+        +checkVelocity(account) void
+    }
+
+    class BillerAdapter {
+        <<interface>>
+        +inquire(inputFields) BillerResult
+        +pay(payment) BillerResult
+        +checkStatus(payment) BillerResult
+    }
+    class BillerAdapterRegistry {
+        <<service>>
+        +resolve(biller) BillerAdapter
+    }
+    class ElectroCoAdapter
+    class AquaCoAdapter
+    class TopUpNetAdapter
+    class BillerResult {
+        <<abstract>>
+        +String billerReference
+        +String rawCode
+    }
+    class BillerAccepted
+    class BillerRefused {
+        +String mappedReason
+    }
+    class BillerTimedOut
+    class BillerPending
+    class BillerError
+    class BillerCallLog {
+        +UUID id
+        +BillerOperation operation
+        +String requestBody
+        +String responseBody
+        +BillerOutcome outcome
+        +int httpStatus
+        +int durationMs
+        +DateTime createdAt
+    }
+    class BillerCallbackLog {
+        +UUID id
+        +String billerReference
+        +String externalEventId
+        +String callbackStatus
+        +String dedupeKey
+        +Map payload
+        +CallbackResult processingResult
+        +DateTime receivedAt
+    }
+
+    class Notification {
+        +UUID id
+        +Channel channel
+        +String message
+        +NotificationStatus status
+        +int attempts
+        +String lastError
+        +DateTime nextAttemptAt
+        +DateTime sentAt
+        +DateTime createdAt
+        +markSent() void
+        +markFailed() void
+    }
+
+    class ReconciliationRun {
+        +UUID id
+        +Date settlementDate
+        +String fileName
+        +ReconStatus status
+        +DateTime startedAt
+        +DateTime finishedAt
+        +run() void
+    }
+    class SettlementRow {
+        +UUID id
+        +String billerReference
+        +Decimal amount
+        +String settlementStatus
+        +MatchResult matchResult
+    }
+    class Discrepancy {
+        +UUID id
+        +DiscrepancyType type
+        +String expected
+        +String actual
+        +DiscrepancyStatus status
+        +DateTime resolvedAt
+        +DateTime createdAt
+        +resolve(staff) void
+    }
+
+    class PaymentStatus {
+        <<enumeration>>
+        INITIATED
+        REJECTED
+        SENT_TO_BILLER
+        COMPLETED
+        FAILED
+        UNKNOWN
+        REFUNDED
+    }
+    class EntryType {
+        <<enumeration>>
+        LEDGER_OPEN
+        TOPUP
+        AGENT_CASH_IN
+        HOLD
+        HOLD_RELEASE
+        CHARGE
+        FEE
+        COMMISSION
+        AGENT_FLOAT
+    }
+    class VerificationLevel {
+        <<enumeration>>
+        BASIC
+        VERIFIED
+    }
+    class WalletType {
+        <<enumeration>>
+        CUSTOMER
+        AGENT
+        FEE_INCOME
+        BILLER_PAYABLE
+        TOPUP_CLEARING
+    }
+    class FeeType {
+        <<enumeration>>
+        FIXED
+        PERCENTAGE
+        TIERED
+    }
+    class Protocol {
+        <<enumeration>>
+        REST_JSON
+        SOAP_XML
+        REST_ASYNC
+    }
+    class Channel {
+        <<enumeration>>
+        SMS
+        PUSH
+    }
+    class NotificationStatus {
+        <<enumeration>>
+        QUEUED
+        SENT
+        FAILED
+        UNDELIVERED
+    }
+    class RejectionReason {
+        <<enumeration>>
+        EXCEEDS_SINGLE_LIMIT
+        EXCEEDS_DAILY_LIMIT
+        INSUFFICIENT_FUNDS
+        VELOCITY_BLOCKED
+        ACCOUNT_BLOCKED
+        BILLER_DISABLED
+        SERVICE_DISABLED
+    }
+
+    class LedgerService {
+        <<service>>
+        +postBalancedEntries(entries) List~LedgerEntry~
+        +verifyGlobalBalance() boolean
+    }
+    class BillerManagementService {
+        <<service>>
+        +addBiller(admin, data) Biller
+        +editBiller(admin, biller, changes) Biller
+        +disableBiller(admin, biller) void
+        +enableBiller(admin, biller) void
+        +addService(admin, biller, data) BillerService
+        +editService(admin, service, changes) BillerService
+        +disableService(admin, service) void
+        +setFeeRule(admin, service, rule) FeeRule
+        +addPromotion(admin, target, promotion) Promotion
+    }
+
+    class AccountManagementService {
+        <<service>>
+        +submitVerification(customer, documentRef) VerificationRequest
+        +approveVerification(admin, request, reasonCode) void
+        +rejectVerification(admin, request, reasonCode) void
+        +updateLimitPolicy(admin, level, singleLimit, dailyLimit, reasonCode) LimitPolicy
+        +blockAccount(actor, holder, reasonCode, until) AccountBlock
+        +unblockAccount(actor, holder, reasonCode) void
+    }
+
+    class IdempotencyRecord {
+        +UUID accountHolderId
+        +String idempotencyKey
+        +UUID paymentId
+        +DateTime createdAt
+    }
+
+    class AccountStatus {
+        <<enumeration>>
+        ACTIVE
+        BLOCKED
+    }
+    class VerificationStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+    }
+    class ActorType {
+        <<enumeration>>
+        CUSTOMER
+        AGENT
+        STAFF
+        SYSTEM
+    }
+    class BillerOutcome {
+        <<enumeration>>
+        ACCEPTED
+        REFUSED
+        TIMEOUT
+        PENDING
+        ERROR
+    }
+    class StaffRole {
+        <<enumeration>>
+        ADMIN
+        SUPPORT
+        RISK
+        FINANCE
+    }
+    class AuditType {
+        <<enumeration>>
+        MONEY
+        ADMIN
+    }
+    class BillerStatus {
+        <<enumeration>>
+        ACTIVE
+        DISABLED
+    }
+    class ServiceCategory {
+        <<enumeration>>
+        ELECTRICITY
+        WATER
+        MOBILE_TOPUP
+        INTERNET
+    }
+    class BillerOperation {
+        <<enumeration>>
+        INQUIRY
+        PAY
+        STATUS
+    }
+    class CallbackResult {
+        <<enumeration>>
+        APPLIED
+        IGNORED_DUPLICATE
+        UNKNOWN_REFERENCE
+        IGNORED_INVALID_STATE
+    }
+    class ReconStatus {
+        <<enumeration>>
+        RUNNING
+        DONE
+        FAILED
+    }
+    class MatchResult {
+        <<enumeration>>
+        MATCHED
+        MISMATCH
+        ORPHAN
+    }
+    class DiscrepancyType {
+        <<enumeration>>
+        AMOUNT_MISMATCH
+        STATE_MISMATCH
+        ORPHAN_SETTLEMENT
+        MISSING_SETTLEMENT
+    }
+    class DiscrepancyStatus {
+        <<enumeration>>
+        OPEN
+        RESOLVED
+    }
+
+    AccountHolder <|-- Customer
+    AccountHolder <|-- Agent
+    Customer "1" --> "0..*" VerificationRequest : submits
+    StaffUser "1" --> "0..*" VerificationRequest : reviews
+    Customer "*" --> "1" LimitPolicy : governed by level
+    AccountHolder "1" --> "0..*" AccountBlock : may be blocked
+
+    AccountHolder "0..1" --> "1" Wallet : owns exactly one, system wallets have no holder
+    Wallet "1" --> "0..*" LedgerEntry : append only history
+    LedgerEntry "0..1" -- "1" AuditRecord : every entry has exactly one MONEY audit
+    Biller "0..1" --> "1" Wallet : exactly one BILLER_PAYABLE wallet per biller, other wallets have no biller
+    LedgerEntry --> EntryType
+    Wallet --> WalletType
+
+    Biller "1" *-- "1..*" BillerService : offers
+    BillerService "1" --> "1" FeeRule : priced by
+    FeeRule "1" *-- "0..*" FeeTier : tiers
+    BillerService "0..1" --> "0..*" Promotion : promoted by
+    Biller "0..1" --> "0..*" Promotion : promotion for all its services
+    FeeCalculator ..> FeeRule : uses
+    FeeCalculator ..> Promotion : uses
+    FeeRule --> FeeType
+    Biller --> Protocol
+
+    Customer "1" --> "0..*" Inquiry : requests
+    BillerService "1" --> "0..*" Inquiry : for
+    Inquiry "1" --> "0..*" Payment : confirmed as
+    Customer "1" --> "0..*" Payment : pays
+    Agent "0..1" --> "0..*" Payment : initiates for customer
+    BillerService "1" --> "0..*" Payment : targets
+    Payment "0..1" --> "0..*" LedgerEntry : posts
+    Payment "*" --> "1" Wallet : debited from
+    Payment "*" --> "1" FeeRule : fee computed by
+    Payment "*" --> "0..1" Promotion : applied
+    Payment "1" *-- "1..*" PaymentStateHistory : history
+    Payment --> PaymentStatus
+    Payment --> RejectionReason
+    PaymentStateMachine ..> Payment : validates transitions
+    PaymentStateMachine ..> PaymentTransitionRule : reads legal pairs
+    PaymentTransitionRule "0..1" --> "0..*" PaymentStateHistory : legal pair, none for the creation row
+    PaymentService ..> PaymentStateMachine : uses
+    PaymentService ..> RiskChecker : uses
+    PaymentService ..> FeeCalculator : uses
+    PaymentService ..> BillerAdapter : calls
+    PaymentService ..> NotificationService : queues outcome notifications
+    RiskChecker ..> LimitPolicy : reads
+    RiskChecker ..> AccountBlock : creates 10 minute VELOCITY block
+    RiskChecker ..> AuditService : ADMIN audit for the velocity block, actor SYSTEM
+
+    BillerAdapter <|.. ElectroCoAdapter
+    BillerAdapter <|.. AquaCoAdapter
+    BillerAdapter <|.. TopUpNetAdapter
+    BillerAdapter ..> BillerResult : returns
+    BillerResult <|-- BillerAccepted
+    BillerResult <|-- BillerRefused
+    BillerResult <|-- BillerTimedOut
+    BillerResult <|-- BillerPending
+    BillerResult <|-- BillerError
+    Biller "1" --> "0..*" BillerCallLog : logs
+    Payment "0..1" --> "0..*" BillerCallLog : calls
+    Inquiry "0..1" --> "0..*" BillerCallLog : inquiry calls
+    Biller "1" --> "0..*" BillerCallbackLog : receives
+    Payment "0..1" --> "0..*" BillerCallbackLog : callbacks
+
+    Payment "1" --> "0..*" Notification : triggers
+    AccountHolder "1" --> "0..*" Notification : receives
+    Notification --> Channel
+    Notification --> NotificationStatus
+
+    Biller "1" --> "0..*" ReconciliationRun : settled by
+    ReconciliationRun "1" *-- "0..*" SettlementRow : rows
+    ReconciliationRun "1" *-- "0..*" Discrepancy : findings
+    SettlementRow "0..*" --> "0..1" Payment : matched to
+    Discrepancy "0..*" --> "0..1" Payment : about
+    SettlementRow "0..1" --> "0..*" Discrepancy : flagged in
+    StaffUser "0..1" --> "0..*" Discrepancy : resolves
+
+    Customer "1" --> "0..*" TopUp : tops up
+    Agent "0..1" --> "0..*" TopUp : cash in for customer
+    TopUp "0..1" --> "0..2" LedgerEntry : COMPLETED posts exactly 2, FAILED posts 0
+    TopUp --> TopUpChannel
+    TopUp --> TopUpStatus
+
+    WalletService ..> Wallet : opens with LEDGER_OPEN
+    WalletService ..> TopUp : creates
+    PaymentService ..> WalletService : uses
+    NotificationService ..> Notification : creates and retries
+    ReconciliationService ..> ReconciliationRun : creates
+    ReconciliationService ..> Payment : matches by billerReference, else by reference
+    ReconciliationService ..> PaymentService : resolves UNKNOWN through completePayment or failPayment
+    Customer ..> LimitPolicy : singleLimit and dailyLimit
+    Customer ..> Payment : paidToday sums non rejected
+
+    InquiryService ..> BillerAdapterRegistry : resolves adapter
+    InquiryService ..> BillerAdapter : inquire
+    InquiryService ..> FeeCalculator : computeFee and buildSnapshot
+    InquiryService ..> Inquiry : creates
+    InquiryService ..> BillerCallLog : logs INQUIRY call
+    PaymentService ..> BillerAdapterRegistry : resolves adapter
+    BillerAdapterRegistry ..> BillerAdapter : returns
+    BillerAdapterRegistry ..> Biller : reads adapter_key
+
+    PaymentService ..> LedgerService : posts
+    WalletService ..> LedgerService : posts
+    WalletService ..> StaffUser : FINANCE funds agent float
+    LedgerService ..> Wallet : locks and checks non negative
+    LedgerService ..> LedgerEntry : creates
+    LedgerService ..> AuditService : MONEY audit per entry
+
+    BillerManagementService ..> StaffUser : acts as admin
+    BillerManagementService ..> Biller : add edit disable
+    BillerManagementService ..> BillerService : manage services
+    BillerManagementService ..> FeeRule : configure fees
+    BillerManagementService ..> Promotion : configure promotions
+    BillerManagementService ..> AuditService : ADMIN audit first
+
+    SupportService ..> PaymentTrace : returns
+    SupportService ..> Payment : finds by reference
+    PaymentTrace ..> PaymentStateHistory : includes
+    PaymentTrace ..> BillerCallLog : includes
+    PaymentTrace ..> BillerCallbackLog : includes
+    PaymentTrace ..> Notification : includes
+    SupportService ..> StaffUser : acts as support
+
+    AccountManagementService ..> StaffUser : acts as admin, risk, or support (support may only block)
+    AccountManagementService ..> VerificationRequest : approve reject
+    AccountManagementService ..> LimitPolicy : edit limits
+    AccountManagementService ..> AccountBlock : block unblock
+    AccountManagementService ..> AuditService : ADMIN audit first
+    AuditRecord --> AuditType
+
+    Agent ..> Payment : earnCommission after COMPLETED
+    Agent ..> LedgerService : earnCommission posts through it
+
+    AccountHolder "1" --> "0..*" IdempotencyRecord : submits
+    Payment "1" --> "1" IdempotencyRecord : created by key
+    PaymentService ..> IdempotencyRecord : insert or get by accountHolderId and key
+    PaymentService ..> BillerCallbackLog : dedupe by billerId and dedupeKey
+
+    AccountHolder --> AccountStatus
+    Customer --> VerificationLevel
+    StaffUser --> StaffRole
+    VerificationRequest --> VerificationStatus
+    AuditRecord --> ActorType
+    Biller --> BillerStatus
+    BillerService --> BillerStatus
+    BillerService --> ServiceCategory
+    BillerCallLog --> BillerOperation
+    BillerCallLog --> BillerOutcome
+    BillerCallbackLog --> CallbackResult
+    ReconciliationRun --> ReconStatus
+    SettlementRow --> MatchResult
+    Discrepancy --> DiscrepancyType
+    Discrepancy --> DiscrepancyStatus
