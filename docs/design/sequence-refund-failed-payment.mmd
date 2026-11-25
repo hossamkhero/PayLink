@@ -22,7 +22,7 @@ sequenceDiagram
 
     alt SMS delivered
         SMS-->>NotificationService: OK
-        NotificationService-->>Customer: Payment failed; money returned
+        NotificationService-->>Customer: Payment failed, money returned
     else Provider unavailable
         SMS-->>NotificationService: Error
         NotificationService->>SMS: Retry up to 3 times
