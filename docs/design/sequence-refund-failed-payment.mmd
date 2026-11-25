@@ -11,7 +11,7 @@ sequenceDiagram
     Note over PaymentService,Biller: Biller refusal already received, 352.50 is held
 
     PaymentService->>PaymentService: SENT_TO_BILLER to FAILED
-    Note right of PaymentService: No fee is posted; fees apply only to completed payments
+    Note right of PaymentService: No fee is posted, fees apply only to completed payments
 
     PaymentService->>LedgerService: HOLD_RELEASE
     LedgerService-->>PaymentService: Ledger entries and audit record posted
