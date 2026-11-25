@@ -8,7 +8,7 @@ sequenceDiagram
     participant NotificationService
     participant SMS as SMS provider
 
-    Note over PaymentService,Biller: Biller refusal already received; 352.50 is held
+    Note over PaymentService,Biller: Biller refusal already received, 352.50 is held
 
     PaymentService->>PaymentService: SENT_TO_BILLER to FAILED
     Note right of PaymentService: No fee is posted; fees apply only to completed payments
