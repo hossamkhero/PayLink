@@ -49,10 +49,10 @@ erDiagram
         varchar currency
         timestamptz created_at
     }
-    wallet_balance {
+    wallet_balance_view {
         uuid wallet_id PK
-        decimal available
-        decimal held
+        decimal available "computed from ledger"
+        decimal held "computed from ledger"
     }
     ledger_entry {
         uuid id PK
@@ -225,7 +225,7 @@ erDiagram
         varchar biller_reference
         varchar external_event_id
         varchar callback_status
-        varchar dedupe_key
+        varchar dedupe_key UK
         jsonb payload
         varchar processing_result
         timestamptz received_at
@@ -287,7 +287,7 @@ erDiagram
     fee_rule ||--o{ payment : "fee computed by"
     promotion |o--o{ payment : "applied to"
     wallet ||--o{ ledger_entry : records
-    wallet ||--|| wallet_balance : "derived view"
+    wallet ||--|| wallet_balance_view : "derived view"
     ledger_entry |o--|| audit_log : "each entry has exactly one audit, admin audits have no entry"
     payment |o--o{ ledger_entry : posts
     topup |o--o{ ledger_entry : "COMPLETED has exactly 2 entries, FAILED has none, deferred trigger"
