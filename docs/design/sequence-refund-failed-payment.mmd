@@ -8,25 +8,25 @@ sequenceDiagram
     participant NotificationService
     participant SMS as SMS provider
 
-    Note over PaymentService,Biller: Biller refusal already received; payment is SENT_TO_BILLER and 352.50 is held
+    Note over PaymentService,Biller: Biller refusal already received; 352.50 is held
 
     PaymentService->>PaymentService: SENT_TO_BILLER to FAILED
-    Note right of PaymentService: no fee is posted (fee only on COMPLETED)
+    Note right of PaymentService: No fee is posted; fees apply only to completed payments
 
-    PaymentService->>LedgerService: HOLD_RELEASE (held minus 352.50, available plus 352.50)
-    LedgerService-->>PaymentService: ledger entries and audit record posted
+    PaymentService->>LedgerService: HOLD_RELEASE
+    LedgerService-->>PaymentService: Ledger entries and audit record posted
     PaymentService->>PaymentService: FAILED to REFUNDED
 
     PaymentService->>NotificationService: queuePaymentOutcome(payment)
-    NotificationService->>SMS: send SMS with readable reason
+    NotificationService->>SMS: Send SMS with readable reason
 
     alt SMS delivered
-        SMS-->>NotificationService: ok
-        NotificationService-->>Customer: SMS - payment failed, money returned
-    else provider down
-        SMS-->>NotificationService: error
-        NotificationService->>SMS: retry (up to 3 times)
-        NotificationService->>NotificationService: still failing, mark UNDELIVERED
+        SMS-->>NotificationService: OK
+        NotificationService-->>Customer: Payment failed; money returned
+    else Provider unavailable
+        SMS-->>NotificationService: Error
+        NotificationService->>SMS: Retry up to 3 times
+        NotificationService->>NotificationService: Mark UNDELIVERED if retries fail
     end
 
-    Note over Customer,SMS: An UNKNOWN payment is never refunded directly. It must first become FAILED (late refusal or reconciliation finds nothing), then follows this same flow.
+    Note over Customer,SMS: UNKNOWN payments are not refunded directly. They must first become FAILED.
