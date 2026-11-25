@@ -1,0 +1,25 @@
+stateDiagram-v2
+    [*] --> INITIATED : payment created
+
+    INITIATED --> FUNDS_HELD : checks pass and funds available
+    INITIATED --> REJECTED : check fails or insufficient funds
+
+    FUNDS_HELD --> SENT_TO_BILLER : request sent to biller
+
+    SENT_TO_BILLER --> COMPLETED : biller confirms
+    SENT_TO_BILLER --> FAILED : biller refuses
+    SENT_TO_BILLER --> UNKNOWN : no answer in 10 s
+
+    UNKNOWN --> COMPLETED : late confirmation
+    UNKNOWN --> FAILED : late refusal or reconciliation finds nothing
+
+    FAILED --> REFUNDED : hold released to wallet
+
+    COMPLETED --> [*]
+    REJECTED --> [*]
+    REFUNDED --> [*]
+
+    note right of UNKNOWN
+        Money stays held.
+        Never refunded automatically.
+    end note

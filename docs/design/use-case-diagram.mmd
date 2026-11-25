@@ -1,0 +1,67 @@
+flowchart LR
+    Customer["Customer"]
+    Agent["Agent"]
+    Support["Support (staff)"]
+    Admin["Admin (staff)"]
+    Finance["Finance (staff)"]
+    Biller["Biller<br/>ElectroCo, AquaCo, TopUpNet"]
+    Timer["System timer"]
+
+    subgraph PayLink["PayLink backend"]
+        direction TB
+        UC01(["Register<br/>US-01"])
+        UC02(["Submit verification<br/>US-02"])
+        UC03(["View balance and history<br/>US-03"])
+        UC04(["Top up wallet<br/>US-04"])
+        UC06(["Browse billers<br/>US-06"])
+        UC09(["Run bill inquiry<br/>US-09"])
+        UC10(["Pay a bill<br/>US-10 to US-14"])
+        UC18(["Pay on behalf of customer<br/>US-18"])
+
+        UCRISK(["Check limits and fraud rules<br/>US-19, US-20"])
+        UCBILLER(["Call biller<br/>US-16"])
+        UCNOTIF(["Send SMS and push<br/>US-22, US-23"])
+
+        UCCB(["Handle TopUpNet callback<br/>US-15"])
+        UCRETRY(["Retry Unknown payments<br/>US-14"])
+
+        UC07(["Manage billers and services<br/>US-07"])
+        UCAPP(["Approve verification<br/>US-02"])
+        UC21(["Search payment by reference<br/>US-21"])
+        UCBLOCK(["Block or unblock account"])
+        UC25(["Run nightly reconciliation<br/>US-25"])
+    end
+
+    Customer --- UC01
+    Customer --- UC02
+    Customer --- UC03
+    Customer --- UC04
+    Customer --- UC06
+    Customer --- UC09
+    Customer --- UC10
+
+    Agent --- UC04
+    Agent --- UC18
+
+    Admin --- UC07
+    Admin --- UCAPP
+
+    Support --- UC21
+    Support --- UCBLOCK
+
+    Finance --- UC25
+
+    UCCB --- Biller
+    UCBILLER --- Biller
+    UC25 --- Biller
+
+    Timer --- UCRETRY
+    Timer --- UC25
+
+    UC18 -. "specialises" .-> UC10
+    UC10 -. "include" .-> UC09
+    UC10 -. "include" .-> UCRISK
+    UC10 -. "include" .-> UCBILLER
+    UC10 -. "include" .-> UCNOTIF
+    UCRETRY -. "include" .-> UCBILLER
+    UCCB -. "include" .-> UCNOTIF
