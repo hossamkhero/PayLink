@@ -6,6 +6,7 @@ flowchart LR
     Finance["Finance (staff)"]
     Biller["Biller<br/>ElectroCo, AquaCo, TopUpNet"]
     Timer["System timer"]
+    Auditor["Auditor (regulator)"]
 
     subgraph PayLink["PayLink backend"]
         direction TB
@@ -13,10 +14,14 @@ flowchart LR
         UC02(["Submit verification<br/>US-02"])
         UC03(["View balance and history<br/>US-03"])
         UC04(["Top up wallet<br/>US-04"])
+        UC05(["Verify ledger-derived balances<br/>US-05"])
         UC06(["Browse billers<br/>US-06"])
         UC09(["Run bill inquiry<br/>US-09"])
         UC10(["Pay a bill<br/>US-10 to US-14"])
         UC18(["Pay on behalf of customer<br/>US-18"])
+
+
+
 
         UCRISK(["Check limits and fraud rules<br/>US-19, US-20"])
         UCBILLER(["Call biller<br/>US-16"])
@@ -28,7 +33,7 @@ flowchart LR
         UC07(["Manage billers and services<br/>US-07"])
         UCAPP(["Approve verification<br/>US-02"])
         UC21(["Search payment by reference<br/>US-21"])
-        UCBLOCK(["Block or unblock account"])
+        UC24(["View audit log<br/>US-24"])
         UC25(["Run nightly reconciliation<br/>US-25"])
     end
 
@@ -47,7 +52,9 @@ flowchart LR
     Admin --- UCAPP
 
     Support --- UC21
-    Support --- UCBLOCK
+
+    Auditor --- UC05
+    Auditor --- UC24
 
     Finance --- UC25
 
@@ -62,6 +69,7 @@ flowchart LR
     UC10 -. "include" .-> UC09
     UC10 -. "include" .-> UCRISK
     UC10 -. "include" .-> UCBILLER
+    UC09 -. "include" .-> UCBILLER
     UC10 -. "include" .-> UCNOTIF
     UCRETRY -. "include" .-> UCBILLER
     UCCB -. "include" .-> UCNOTIF
