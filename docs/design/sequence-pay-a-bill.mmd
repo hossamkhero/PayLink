@@ -1,0 +1,67 @@
+sequenceDiagram
+    autonumber
+    actor Customer
+    participant API
+    participant InquiryService
+    participant PaymentService
+    participant RiskChecker
+    participant LedgerService
+    participant BillerAdapter as BillerAdapter (ElectroCo)
+    participant Biller as ElectroCo
+    participant NotificationService
+
+    Note over Customer,Biller: Part 1 - Bill inquiry
+    Customer->>API: enter meter number
+    API->>InquiryService: createInquiry(customer, service, inputFields)
+    InquiryService->>BillerAdapter: inquire(inputFields)
+    BillerAdapter->>Biller: get bill
+    Biller-->>BillerAdapter: 350.00 EGP due
+    BillerAdapter-->>InquiryService: amountDue 350.00
+    InquiryService->>InquiryService: FeeCalculator.computeFee = 2.50
+    InquiryService-->>Customer: inquiryId, amount 350.00, fee 2.50, total 352.50
+
+    Note over Customer,Biller: Part 2 - Payment
+    Customer->>API: pay(inquiryId) with idempotencyKey
+    API->>PaymentService: submit(accountHolderId, request, idempotencyKey)
+    PaymentService->>PaymentService: findExisting(accountHolderId, idempotencyKey)
+
+    alt same key already used
+        PaymentService-->>Customer: return the original payment (no new charge)
+    else new key
+        PaymentService->>PaymentService: create payment (INITIATED)
+        PaymentService->>RiskChecker: single limit, daily limit, velocity, blocked
+        alt a rule fails
+            RiskChecker-->>PaymentService: rejection reason
+            PaymentService-->>Customer: REJECTED with reason
+        else rules pass
+            PaymentService->>LedgerService: hold 352.50 (available to held)
+            alt insufficient funds
+                LedgerService-->>PaymentService: INSUFFICIENT_FUNDS
+                PaymentService-->>Customer: REJECTED with reason
+            else hold posted
+                PaymentService->>PaymentService: INITIATED to FUNDS_HELD
+                PaymentService->>PaymentService: FUNDS_HELD to SENT_TO_BILLER
+                PaymentService->>BillerAdapter: pay(payment) - 10 s timeout
+                BillerAdapter->>Biller: send payment with reference
+
+                alt biller confirms
+                    Biller-->>BillerAdapter: paid
+                    BillerAdapter-->>PaymentService: BillerAccepted
+                    PaymentService->>PaymentService: SENT_TO_BILLER to COMPLETED
+                    PaymentService->>LedgerService: CHARGE 352.50 from held, FEE 2.50 to fee income
+                    Note right of LedgerService: agent payment also posts COMMISSION (40% of fee)
+                else biller refuses
+                    BillerAdapter-->>PaymentService: BillerRefused
+                    PaymentService->>PaymentService: SENT_TO_BILLER to FAILED
+                    Note right of PaymentService: continues in the refund diagram
+                else no answer in 10 s
+                    BillerAdapter-->>PaymentService: BillerTimedOut
+                    PaymentService->>PaymentService: SENT_TO_BILLER to UNKNOWN
+                    Note right of PaymentService: money stays held, retry at +1, +5, +15 min
+                end
+                PaymentService->>NotificationService: queuePaymentOutcome(payment)
+                NotificationService-->>Customer: SMS and push
+                PaymentService-->>Customer: payment status
+            end
+        end
+    end

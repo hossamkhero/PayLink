@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    actor Customer
+    participant PaymentService
+    participant BillerAdapter as BillerAdapter (AquaCo)
+    participant Biller as AquaCo
+    participant LedgerService
+    participant NotificationService
+    participant SMS as SMS provider
+
+    Note over PaymentService,Biller: Payment is SENT_TO_BILLER, 352.50 is held
+    PaymentService->>BillerAdapter: pay(payment)
+    BillerAdapter->>Biller: SOAP payment request
+    Biller-->>BillerAdapter: error code
+    BillerAdapter-->>PaymentService: BillerRefused(mappedReason)
+
+    PaymentService->>PaymentService: SENT_TO_BILLER to FAILED
+    Note right of PaymentService: no fee is posted (fee only on COMPLETED)
+
+    PaymentService->>LedgerService: HOLD_RELEASE (held minus 352.50, available plus 352.50)
+    LedgerService-->>PaymentService: entries posted with MONEY audit
+    PaymentService->>PaymentService: FAILED to REFUNDED
+
+    PaymentService->>NotificationService: queuePaymentOutcome(payment)
+    NotificationService->>SMS: send SMS with readable reason
+
+    alt SMS delivered
+        SMS-->>NotificationService: ok
+        NotificationService-->>Customer: SMS - payment failed, money returned
+    else provider down
+        SMS-->>NotificationService: error
+        NotificationService->>SMS: retry (up to 3 times)
+        NotificationService->>NotificationService: still failing, mark UNDELIVERED
+    end
+
+    Note over Customer,SMS: An UNKNOWN payment is never refunded directly. It must first become FAILED (late refusal or reconciliation finds nothing), then follows this same flow.
