@@ -369,9 +369,10 @@ classDiagram
         +resolve(staff) void
     }
 
-    class PaymentStatus {
+       class PaymentStatus {
         <<enumeration>>
         INITIATED
+        FUNDS_HELD
         REJECTED
         SENT_TO_BILLER
         COMPLETED
